@@ -1,4 +1,4 @@
-module observer
+module services
 
 go 1.18
 
