@@ -116,10 +116,12 @@ func main() {
 		err = s.Install()
 		if err != nil {
 			errlog.Println("Failed to install "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 		err = s.Start()
 		if err != nil {
 			errlog.Println("Failed to start "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 
 		os.Exit(0)
@@ -127,6 +129,7 @@ func main() {
 		err = s.Start()
 		if err != nil {
 			errlog.Println("Failed to start "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 
 		os.Exit(0)
@@ -134,6 +137,7 @@ func main() {
 		err = s.Stop()
 		if err != nil {
 			errlog.Println("Failed to stop "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 
 		os.Exit(0)
@@ -141,22 +145,41 @@ func main() {
 		err = s.Stop()
 		if err != nil {
 			errlog.Print("Failed to stop "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 
 		err = s.Uninstall()
 		if err != nil {
 			errlog.Print("Failed to remove "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 
+		os.Exit(0)
+	case "status":
+		status, err := s.Status()
+		if err != nil {
+			errlog.Print("Failed to get status of "+sc.Name+": ", err)
+			os.Exit(1)
+		}
+		switch status {
+		case service.StatusUnknown:
+			errlog.Print("Failed to get status of "+sc.Name+": ", "Unable to be determined due to an error or it was not installed")
+			os.Exit(1)
+		case service.StatusRunning:
+			stdlog.Print("Status: [", sc.Name, "] is currently RUNNING on system")
+		case service.StatusStopped:
+			stdlog.Print("Status: [", sc.Name, "] is currently STOPPED on system")
+		}
 		os.Exit(0)
 	case "service":
 		err = s.Run()
 		if err != nil {
 			errlog.Print("Failed to run "+sc.Name+": ", err)
+			os.Exit(1)
 		}
 	default:
 		errlog.Println("Unrecognized command: " + cmdArg)
 		errlog.Println("Usage: <service> install | remove | start | stop | status")
-		os.Exit(0)
+		os.Exit(1)
 	}
 }

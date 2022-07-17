@@ -31,8 +31,8 @@ remove: remove_service_observer remove_service_handler ## Remove both services
 
 .PHONY: status
 status: build ## Status of services
-	./bin/handler status
-	./bin/observer status
+	@./bin/handler status
+	@./bin/observer status
 
 .PHONY: install_service_observer
 install_service_observer: build ## Install observer service
