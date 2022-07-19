@@ -1,6 +1,7 @@
 package main
 
 import (
+	"agent"
 	"github.com/kardianos/service"
 	"log"
 	"net"
@@ -12,9 +13,7 @@ import (
 var stdlog, errlog *log.Logger
 
 var config = map[string]string{
-	"port":             ":9977",
-	"period":           "20s",
-	"service_to_serve": "handler",
+	"port": ":9977", // port for observer service to ping
 }
 
 type program struct{}
@@ -38,6 +37,9 @@ func (p *program) run() {
 	// set up channel on which to send accepted connections
 	ping := make(chan net.Conn, 100)
 	go acceptPing(listener, ping)
+
+	// Running our agent
+	agent.RunAgent()
 
 	// loop work cycle with accept connections or interrupt
 	// by system signal
@@ -84,10 +86,15 @@ func init() {
 func main() {
 	args := []string{"service"}
 
+	options := map[string]interface{}{
+		"Restart": "on-failure",
+	}
+
 	var sc = &service.Config{
-		Name:        "handler",
-		DisplayName: "handler",
-		Description: "Example of a go service",
+		Name:        "agent",
+		DisplayName: "agent",
+		Description: "Token agent",
+		Option:      options,
 		Arguments:   args,
 	}
 

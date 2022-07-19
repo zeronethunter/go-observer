@@ -13,9 +13,9 @@ import (
 var stdlog, errlog *log.Logger
 
 var config = map[string]string{
-	"port":             ":9977",
-	"period":           "20s",
-	"service_to_serve": "handler",
+	"port":             ":9977", // port to ping
+	"period":           "5s",    // duration between pings
+	"service_to_serve": "agent", // name of service to observe
 }
 
 type program struct{}
@@ -59,25 +59,22 @@ func ping(interrupt chan os.Signal) {
 			prg := &program{}
 			s, err := service.New(prg, sc)
 			if err != nil {
-				errlog.Print("Failed to create instance " + config["service_to_serve"] + ": ")
-				errlog.Println(err)
+				errlog.Println("Failed to create instance "+config["service_to_serve"]+": ", err)
 				interrupt <- os.Kill
 			}
-			err = s.Start()
+			err = s.Restart()
 			if err != nil {
-				errlog.Print("Failed to start " + config["service_to_serve"] + ": ")
-				errlog.Println(err)
+				errlog.Println("Failed to start "+config["service_to_serve"]+": ", err)
 			} else {
 				stdlog.Println("Service " + config["service_to_serve"] + " successfully started")
 			}
+		} else {
+			stdlog.Println("Service " + config["service_to_serve"] + " is running...")
 		}
-
-		stdlog.Println("Service " + config["service_to_serve"] + " is running...")
 		wait, err := time.ParseDuration(config["period"])
 		if err != nil {
 			errlog.Println(err)
-			interrupt <- os.Kill
-			return
+			os.Exit(1)
 		}
 		time.Sleep(wait)
 	}
@@ -95,10 +92,15 @@ func init() {
 func main() {
 	args := []string{"service"}
 
+	options := map[string]interface{}{
+		"Restart": "on-failure",
+	}
+
 	var sc = &service.Config{
 		Name:        "observer",
 		DisplayName: "observer",
-		Description: "Example of a go service",
+		Description: "Observer of agent service",
+		Option:      options,
 		Arguments:   args,
 	}
 
