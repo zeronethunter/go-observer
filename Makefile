@@ -20,6 +20,14 @@ else
 	rm -rf ./bin
 endif
 
+.PHONY: build_sender
+build_sender:
+	go build -o ./bin/sender ./sender/sender.go
+
+.PHONY: ping
+ping: build_sender ## Ping agent
+	./bin/sender ping
+
 .PHONY: install
 install: install_service_agent install_service_observer ## Install both services
 

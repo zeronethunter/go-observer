@@ -1,13 +1,14 @@
 package main
 
 import (
+	"agent"
 	"github.com/kardianos/service"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 var stdlog, errlog *log.Logger
@@ -29,10 +30,36 @@ func (p *program) run() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
 
-	go ping(interrupt)
+	// RabbitMQ connection
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	agent.ErrorHandler(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	// RabbitMQ channel
+	channel, err := conn.Channel()
+	agent.ErrorHandler(err, "Failed to open a channel")
+	defer channel.Close()
+
+	q, err := channel.QueueDeclare(
+		"observer_event", // name
+		false,            // durable
+		true,             // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
+
+	pingChannel := pingHandler(channel, q)
 
 	for {
 		select {
+		case d := <-pingChannel:
+			if string(d.Body) == "ping" {
+				state := ping(interrupt)
+				stdlog.Printf("%s: %s\n", "Signal", d.Body)
+				pingResponse(channel, q, state)
+			}
+
 		case killSignal := <-interrupt:
 			stdlog.Println("Got signal:", killSignal)
 			if killSignal == os.Interrupt {
@@ -45,39 +72,59 @@ func (p *program) run() {
 	}
 }
 
-func ping(interrupt chan os.Signal) {
-	for {
-		_, err := net.Dial("tcp", config["port"])
-		if err != nil {
-			args := []string{"service"}
+func pingHandler(channel *amqp.Channel, queue amqp.Queue) <-chan amqp.Delivery {
+	msgs, err := channel.Consume(
+		queue.Name, // queue
+		"",         // consumer
+		true,       // auto-ack
+		false,      // exclusive
+		false,      // no-local
+		false,      // no-wait
+		nil,        // args
+	)
+	agent.ErrorHandler(err, "Failed to register a consumer")
 
-			var sc = &service.Config{
-				Name:      config["service_to_serve"],
-				Arguments: args,
-			}
+	return msgs
+}
 
-			prg := &program{}
-			s, err := service.New(prg, sc)
-			if err != nil {
-				errlog.Println("Failed to create instance "+config["service_to_serve"]+": ", err)
-				interrupt <- os.Kill
-			}
-			err = s.Restart()
-			if err != nil {
-				errlog.Println("Failed to start "+config["service_to_serve"]+": ", err)
-			} else {
-				stdlog.Println("Service " + config["service_to_serve"] + " successfully started")
-			}
-		} else {
-			stdlog.Println("Service " + config["service_to_serve"] + " is running...")
-		}
-		wait, err := time.ParseDuration(config["period"])
-		if err != nil {
-			errlog.Println(err)
-			os.Exit(1)
-		}
-		time.Sleep(wait)
+func pingResponse(channel *amqp.Channel, queue amqp.Queue, msg string) {
+	if err := channel.Publish(
+		"",         // exchange
+		queue.Name, // routing key
+		false,      // mandatory
+		false,      // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte(msg),
+		}); err != nil {
+		agent.ErrorHandler(err, "Failed to send ping message")
 	}
+}
+
+func ping(interrupt chan os.Signal) string {
+	_, err := net.Dial("tcp", config["port"])
+	if err != nil {
+		args := []string{"service"}
+
+		var sc = &service.Config{
+			Name:      config["service_to_serve"],
+			Arguments: args,
+		}
+
+		prg := &program{}
+		s, err := service.New(prg, sc)
+		if err != nil {
+			errlog.Println("Failed to create instance "+config["service_to_serve"]+": ", err)
+			interrupt <- os.Kill
+		}
+		err = s.Restart()
+		if err != nil {
+			return "Failed to start " + config["service_to_serve"] + ": " + err.Error()
+		} else {
+			return "Service " + config["service_to_serve"] + " successfully started"
+		}
+	}
+	return "Service " + config["service_to_serve"] + " is running..."
 }
 
 func (p *program) Stop(s service.Service) error {
@@ -104,6 +151,7 @@ func main() {
 		Arguments:   args,
 	}
 
+	// Service configuration
 	prg := &program{}
 	s, err := service.New(prg, sc)
 	if err != nil {
@@ -111,6 +159,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Command argument of service
 	cmdArg := os.Args[1]
 
 	switch cmdArg {

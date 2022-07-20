@@ -1,6 +1,6 @@
 ## Usage
-```sudo make install``` - to install and start both services
+```make install``` - to install and start both services
 
-```go run sender.go``` - to send config to the agent
+```make ping``` - to ping the agent
 
 ```go run test.go``` - to test agent without creating a service

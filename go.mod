@@ -10,6 +10,6 @@ require (
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/rabbitmq/amqp091-go v1.3.4 // indirect
+	github.com/rabbitmq/amqp091-go v1.4.0 // indirect
 	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 )

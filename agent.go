@@ -29,12 +29,6 @@ const (
 	brokerAddress = "localhost:9092"
 )
 
-func errorHandler(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
-	}
-}
-
 func decodeAlgorithm(code x509.PublicKeyAlgorithm) string {
 	var s string
 	switch code {
@@ -110,12 +104,12 @@ func getCardAndCertInfo(pkcs11Lib string) {
 func getCertificate(p *pkcs11.Ctx, slot uint, sn string) {
 	log.Printf("Slot: %v, SN: %v", slot, sn)
 	session, err := p.OpenSession(slot, pkcs11.CKF_SERIAL_SESSION)
-	errorHandler(err, "Could not open session,: %v")
+	ErrorHandler(err, "Could not open session,: %v")
 	defer p.CloseSession(session)
 
 	certAttr := []*pkcs11.Attribute{pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_CERTIFICATE)}
 	err = p.FindObjectsInit(session, certAttr)
-	errorHandler(err, "Could init to find objects: %v")
+	ErrorHandler(err, "Could init to find objects: %v")
 
 	objects, _, err := p.FindObjects(session, 10000)
 	if err != nil {
@@ -163,10 +157,10 @@ func cardConnnected(devId string, info pkcs11.TokenInfo) {
 	headers["ID"] = devId
 	host, err := os.Hostname()
 
-	errorHandler(err, "Can't get hostname")
+	ErrorHandler(err, "Can't get hostname")
 	headers["Hostname"] = host
 	user, err := user.Current()
-	errorHandler(err, "Can't get username")
+	ErrorHandler(err, "Can't get username")
 	headers["Username"] = user.Username
 	err = channel.Publish(
 		"",         // exchange
@@ -179,7 +173,7 @@ func cardConnnected(devId string, info pkcs11.TokenInfo) {
 			Body:        []byte(body),
 			Headers:     headers,
 		})
-	errorHandler(err, "Failed to publish CARD CONNECTED message")
+	ErrorHandler(err, "Failed to publish CARD CONNECTED message")
 }
 
 func certificateFound(certId string, certBody []byte) {
@@ -187,10 +181,10 @@ func certificateFound(certId string, certBody []byte) {
 	headers["Event"] = "CertFound"
 	headers["ID"] = certId
 	host, err := os.Hostname()
-	errorHandler(err, "Can't get hostname")
+	ErrorHandler(err, "Can't get hostname")
 	headers["Hostname"] = host
 	user, err := user.Current()
-	errorHandler(err, "Can't get username")
+	ErrorHandler(err, "Can't get username")
 	headers["Username"] = user.Username
 	err = channel.Publish(
 		"",         // exchange
@@ -203,7 +197,7 @@ func certificateFound(certId string, certBody []byte) {
 			Body:        certBody,
 			Headers:     headers,
 		})
-	errorHandler(err, "Failed to publish CERTIFICATE FOUND message")
+	ErrorHandler(err, "Failed to publish CERTIFICATE FOUND message")
 
 }
 
@@ -215,10 +209,10 @@ func cardRemoved(devId string, info pkcs11.TokenInfo) {
 	headers["ID"] = devId
 	host, err := os.Hostname()
 
-	errorHandler(err, "Can't get hostname")
+	ErrorHandler(err, "Can't get hostname")
 	headers["Hostname"] = host
 	user, err := user.Current()
-	errorHandler(err, "Can't get username")
+	ErrorHandler(err, "Can't get username")
 	headers["Username"] = user.Username
 	err = channel.Publish(
 		"",         // exchange
@@ -231,7 +225,7 @@ func cardRemoved(devId string, info pkcs11.TokenInfo) {
 			Body:        []byte(body),
 			Headers:     headers,
 		})
-	errorHandler(err, "Failed to publish CARD DISCONNECTED message")
+	ErrorHandler(err, "Failed to publish CARD DISCONNECTED message")
 
 	log.Println("Card removed: ", devId, info)
 }
@@ -304,7 +298,7 @@ func configHandler(queue amqp.Queue) <-chan amqp.Delivery {
 		false,      // no-wait
 		nil,        // args
 	)
-	errorHandler(err, "Failed to register a consumer")
+	ErrorHandler(err, "Failed to register a consumer")
 	return msgs
 
 }
@@ -312,11 +306,11 @@ func configHandler(queue amqp.Queue) <-chan amqp.Delivery {
 func RunAgent() {
 	// Init RabbitMQ connection
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
-	errorHandler(err, "Failed to connect to RabbitMQ")
+	ErrorHandler(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
 	channel, err = conn.Channel()
-	errorHandler(err, "Failed to open a channel")
+	ErrorHandler(err, "Failed to open a channel")
 	defer channel.Close()
 
 	queue, err = channel.QueueDeclare(
@@ -327,7 +321,7 @@ func RunAgent() {
 		false,         // no-wait
 		nil,           // arguments
 	)
-	errorHandler(err, "Failed to declare a queue")
+	ErrorHandler(err, "Failed to declare a queue")
 
 	// Create new instance of config
 	config = new(Config)
@@ -362,7 +356,7 @@ func RunAgent() {
 					log.Printf("%s: \n%s", "Received config", d.Body)
 					config.Update()
 				}
-				errorHandler(err, "Failed to unmarshal config")
+				ErrorHandler(err, "Failed to unmarshal config")
 			}
 		case <-quit:
 			ticker.Stop()
