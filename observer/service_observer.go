@@ -117,7 +117,7 @@ func ping(interrupt chan os.Signal) string {
 			errlog.Println("Failed to create instance "+config["service_to_serve"]+": ", err)
 			interrupt <- os.Kill
 		}
-		err = s.Restart()
+		err = s.Start()
 		if err != nil {
 			return "Failed to start " + config["service_to_serve"] + ": " + err.Error()
 		} else {
